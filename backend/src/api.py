@@ -1,5 +1,5 @@
 import os
-from flask import Flask, request, jsonify, abort
+from flask import Flask, request, jsonify, abort, app
 from sqlalchemy import exc
 import json
 from flask_cors import CORS
@@ -7,29 +7,49 @@ from flask_cors import CORS
 from .database.models import db_drop_and_create_all, setup_db, Drink
 from .auth.auth import AuthError, requires_auth
 
-app = Flask(__name__)
-setup_db(app)
-CORS(app)
+from backend.src.exceptions import *
 
-'''
-@TODO uncomment the following line to initialize the datbase
-!! NOTE THIS WILL DROP ALL RECORDS AND START YOUR DB FROM SCRATCH
-!! NOTE THIS MUST BE UNCOMMENTED ON FIRST RUN
-!! Running this funciton will add one
-'''
-# db_drop_and_create_all()
+def create_app():
+    app = Flask(__name__)
+    setup_db(app)
+    CORS(app)
 
-# ROUTES
-'''
-@TODO implement endpoint
-    GET /drinks
-        it should be a public endpoint
-        it should contain only the drink.short() data representation
-    returns status code 200 and json {"success": True, "drinks": drinks} where drinks is the list of drinks
-        or appropriate status code indicating reason for failure
-'''
+    with app.app_context():
+        db_drop_and_create_all()
 
+    @app.after_request
+    def after_request(response):
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        response.headers.add('Access-Control-Allow-Headers', 'GET, POST, PATCH, DELETE, OPTIONS')
+        return response
 
+    # ROUTES
+    '''
+    @TODO implement endpoint
+        GET /drinks
+            it should be a public endpoint
+            it should contain only the drink.short() data representation
+        returns status code 200 and json {"success": True, "drinks": drinks} where drinks is the list of drinks
+            or appropriate status code indicating reason for failure
+    '''
+
+    @app.route('/drinks', methods=['GET'])
+    def get_drinks():
+        try:
+            drinks = Drink.query.order_by(Drink.id).all()
+
+            if len(drinks) == 0:
+                raise NotFoundException
+
+            res = jsonify({
+                'success': True,
+                'drinks': {drink.short() for drink in drinks}
+            }), 200
+            return res
+        except NotFoundException:
+            abort(404)
+        except Exception as e:
+            abort(500)
 '''
 @TODO implement endpoint
     GET /drinks-detail
@@ -38,7 +58,6 @@ CORS(app)
     returns status code 200 and json {"success": True, "drinks": drinks} where drinks is the list of drinks
         or appropriate status code indicating reason for failure
 '''
-
 
 '''
 @TODO implement endpoint
@@ -49,7 +68,6 @@ CORS(app)
     returns status code 200 and json {"success": True, "drinks": drink} where drink an array containing only the newly created drink
         or appropriate status code indicating reason for failure
 '''
-
 
 '''
 @TODO implement endpoint
@@ -63,7 +81,6 @@ CORS(app)
         or appropriate status code indicating reason for failure
 '''
 
-
 '''
 @TODO implement endpoint
     DELETE /drinks/<id>
@@ -74,7 +91,6 @@ CORS(app)
     returns status code 200 and json {"success": True, "delete": id} where id is the id of the deleted record
         or appropriate status code indicating reason for failure
 '''
-
 
 # Error Handling
 '''
@@ -89,6 +105,7 @@ def unprocessable(error):
         "error": 422,
         "message": "unprocessable"
     }), 422
+
 
 
 '''
@@ -106,7 +123,6 @@ def unprocessable(error):
 @TODO implement error handler for 404
     error handler should conform to general task above
 '''
-
 
 '''
 @TODO implement error handler for AuthError
